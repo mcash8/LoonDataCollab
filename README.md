@@ -12,7 +12,11 @@ You will need three files:
 - Link Capacities: uses network data to compute data rates between a set of nodes 
 - Loon Data Genie: uses the link intents file to evaluate which links between nodes were made by the TS-SDN 
 - DataVis: visualize nodes, links, and distances. Needs map.json
-- Topology Selection Baseline: Explores topology selection problem using or-tools 
+- Topology Selection Baseline: Explores topology selection problem using or-tools
+
+### Python Files: 
+- CommonImports.py: used to import common python libraries
+- TopologySelectionAutomation.py: Contains functions used in topology selection baseline notebook
 
 ### Packages: 
 - numpy v1.21.5
