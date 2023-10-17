@@ -100,7 +100,7 @@ def getFlowTopologyConstraints(flow_var_dict, topology_var_dict, rho, L_k, solve
         solver.Add(sum(add_top) <= T) #topology control
 
         #flow conservation piecewise function
-        if type(source)!= int:
+        if type(source.item())!= int:
             if i in source: 
                 solver.Add(sum(add)-sum(sub) == rho*L_k)
             elif i in dest: 
