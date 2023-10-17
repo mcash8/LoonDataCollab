@@ -1,10 +1,11 @@
 from CommonImports import *
 
-def pruneCapacity(num_nodes, capacities):
+def pruneCapacity(num_nodes, capacity):
     '''
     Prune capacity matrix according to how many nodes to investigate 
+    Returns a num_nodes x num_nodes capacity matrix 
     '''
-    
+    flight_ids = np.load('flight_ids.npy')
     flt_avgs = []
     rows = list(range(0, capacity[0].shape[0]-1)) #don't want to index the last row
     for row in rows: 
@@ -26,17 +27,15 @@ def pruneCapacity(num_nodes, capacities):
         #average through time and append to list
         flt_avgs.append(np.average(temp))
     
-    flight_ids = np.load('flight_ids.npy')
     
     
-    idx = sorted(range(len(flt_avgs)), key = lambda sub: flt_avgs[sub])[-num_nodes:] #idx of num_nodes largest elements 
-    flt_avgs.sort()
-    flt_avgs = flt_avgs[-num_nodes:]#keep n = num_nodes largest averages 
+    flt_avgs_idx= np.sort(np.argsort(flt_avgs)[-num_nodes:])#index of largest avgs to keep
+    flt_ids_reduced = flight_ids[flt_avgs_idx]
 
-    flight_ids_flt = [flight_ids[i] for i in idx] #labels for the rows, flight_ids is labels for the columns
-    
-    reduced_capacity = capacity[:, idx, idx]
-    return
+    reduced_capacity = capacity[:, flt_avgs_idx, :]
+    reduced_capacity = reduced_capacity[:, :, flt_avgs_idx]
+
+    return reduced_capacity, flt_ids_reduced
 
 
 def getBidirectionalCapacityConstraints(combos, flow_var_dict, topology_var_dict, capacity, solver, infinity):
