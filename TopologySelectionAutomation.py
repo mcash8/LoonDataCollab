@@ -2,6 +2,7 @@ from CommonImports import *
 
 def pruneCapacity(num_nodes, capacity):
     '''
+    !!-------For SCF Solver-------!!
     Prune capacity matrix according to how many nodes to investigate 
     Returns a num_nodes x num_nodes capacity matrix 
     '''
@@ -40,8 +41,10 @@ def pruneCapacity(num_nodes, capacity):
 
 def getBidirectionalCapacityConstraints(combos, flow_var_dict, topology_var_dict, capacity, solver, infinity):
     '''
+    !!-------For SCF Solver-------!!
     Define the topology control and flow variables 
     and add bidirectional and flow constraints to solver
+    Returns a dictionary of flow and topology constraints for the solver
     '''
 
     for combo in combos:
@@ -73,8 +76,9 @@ def getBidirectionalCapacityConstraints(combos, flow_var_dict, topology_var_dict
     
 def getFlowTopologyConstraints(flow_var_dict, topology_var_dict, rho, L_k, solver, T, source, dest, num_nodes):
     '''
-    Define flow conservation constraint equations 
-    and topology control constraints
+    !!-------For SCF Solver-------!!
+    Define flow conservation constraint equations and topology control constraints
+    Returns a dictionary of flow and topology constraints for the solver
     '''
 
     #flow conservation constraint equations and topology control constraint
@@ -118,6 +122,10 @@ def getFlowTopologyConstraints(flow_var_dict, topology_var_dict, rho, L_k, solve
     return topology_var_dict, flow_var_dict
 
 def printSolutionValues(num_nodes, flow_var_dict, topology_var_dict, rho):
+    '''
+    !!-------For Debugging-------!!
+    Print solver solution. Enable for debugging purposes. 
+    '''
     #print('Solution:')
     #print('p = ', rho.solution_value())
      
@@ -152,6 +160,122 @@ def printSolutionValues(num_nodes, flow_var_dict, topology_var_dict, rho):
     return flow_vals, topology_vals
 
 
+def addTopologyVariablesAndConstraints(topology_var_dict, T, solver, combos, num_nodes): 
+    '''
+    !!-------For MCF Solver-------!!
+    Define the topology variables and the topology constraints
+    Add the topology variables and topology contraints to solver
+    '''
+
+    #adding topology variables and bidirectional constraint
+    for combo in combos: 
+        i, j = combo
+
+        #topology keys 
+        key1 = "z" + str(i)+'_'+str(j) #i,j
+        key2 = "z" + str(j)+'_'+str(i) #j,i
+
+        topology_var_dict[key1] = solver.IntVar(0.0, 1.0, "z" + str(i)+str(j))
+        topology_var_dict[key2] = solver.IntVar(0.0, 1.0, "z" + str(j)+str(i))
+
+        #add bidirectional constraint
+        solver.Add(topology_var_dict[key1] == topology_var_dict[key2]) 
+    
+    #accessing topology variables and adding topology control constraint
+    for i in range(1,num_nodes+1): 
+        add_top = [] 
+        for j in range(1,num_nodes+1): 
+            if i!=j: 
+                key = 'z' + str(i) +'_'+ str(j)
+                add_top.append(topology_var_dict[key]) #z_ij
+
+            else: 
+                continue
+        #sum over j        
+        solver.Add(sum(add_top) <= T) 
+    return topology_var_dict
+
+def addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, solver, source, dest, combos, infinity, capacity, num_nodes): 
+    '''
+    !!-------For MCF Solver-------!!
+    Define the flow variables and the flow constraints
+    Add the flow variables and flow contraints to solver
+    '''
+
+    #add flow variables to solver, loop through each commodity, create a nested dictionary for each commodity
+    for i in range(L_k):
+        outter_key = str(i) 
+        inner_dict = {} 
+        for combo in combos: 
+            j, k = combo
+            key1 = 'x'+ str(j) + '_' + str(k)
+            key2 = 'x' + str(k) + '_' + str(j)
+
+            #add flow variables
+            inner_dict[key1] = solver.IntVar(0.0, infinity, "x" + str(j)+str(k))
+            inner_dict[key2] = solver.IntVar(0.0, infinity, "x" + str(k)+str(j))
+
+
+        #nested dict 
+        flow_var_dict[outter_key] = inner_dict
+    
+    #add capacity constraint
+    for combo in combos:
+        #for each (i,j) pair
+        i, j = combo
+
+        #flow keys
+        key0 = 'x' + str(i) +'_'+ str(j) #i,j
+        key1 = 'x' + str(j) +'_'+str(i) #j,i
+
+        key2 = "z" + str(i)+'_'+str(j) #i,j
+        key3 = "z" + str(j)+'_'+str(i) #j,i
+
+        add_1 = []
+        add_2 = [] 
+
+        #sum over k
+        for k in range(L_k): 
+            inner_key = str(k)
+            inner_dict = flow_var_dict[inner_key]
+
+            add_1.append(inner_dict[key0])
+            add_2.append(inner_dict[key1])
+        
+        #capacity constraint
+        solver.Add(sum(add_1) <= capacity[i-1,j-1]*topology_var_dict[key2])
+        solver.Add(sum(add_2) <= capacity[i-1,j-1]*topology_var_dict[key3])
+    
+
+    #add flow conservation constraint
+    for k in range(L_k): 
+        add = [] 
+        sub = [] 
+
+        inner_key = str(k)        
+        inner_dict = flow_var_dict[inner_key]
+
+        for i in range(1, num_nodes+1): 
+
+            for j in range(1, num_nodes+1): 
+                if i!=j: 
+                    key1 = 'x'+ str(i) + '_' + str(j)
+                    key2 = 'x' + str(j) + '_' + str(i)
+
+                    add.append(inner_dict[key1]) #x_ij
+                    sub.append(inner_dict[key2]) #x_ji
+                else: 
+                    continue
+            
+            if i in source: 
+                solver.Add(sum(add)-sum(sub) == rho*L_k[k])
+            elif i in dest: 
+                solver.Add(sum(add)-sum(sub) == -rho*L_k[k])
+            else: 
+                solver.Add(sum(add)-sum(sub) == 0)
+
+    return topology_var_dict, flow_var_dict
+
 def singleCommodityFlow(num_nodes, source, dest, L_k, T, capacity):
     
     '''
@@ -179,6 +303,60 @@ def singleCommodityFlow(num_nodes, source, dest, L_k, T, capacity):
     topology_var_dict, flow_var_dict = getFlowTopologyConstraints(flow_var_dict, topology_var_dict, rho, L_k, solver, T, source, dest, num_nodes)
    
          
+    #define the objective
+    solver.Maximize(rho)
+
+    #call the solver
+    #print(f'Solving with {solver.SolverVersion()}')
+    status = solver.Solve()
+    
+    
+    if status == pywraplp.Solver.OPTIMAL:
+        flow_vals, topology_vals = printSolutionValues(num_nodes, flow_var_dict, topology_var_dict, rho)
+ 
+        '''
+        print('\nAdvanced usage:')
+        print('Problem solved in %f milliseconds' % solver.wall_time())
+        print('Problem solved in %d iterations' % solver.iterations())
+        print('Problem solved in %d branch-and-bound nodes' % solver.nodes())
+        '''
+        return rho.solution_value(), topology_vals
+        
+    else:
+        print('The problem does not have an optimal solution.')
+        
+        return
+
+def solveMultiCommodityFlow(num_nodes, source, dest, L_k, T, capacity): 
+    '''
+    Solve multicommodity flow problem 
+    '''
+
+    #check source, dest, and l_k are lists 
+    if not all(isinstance(i, list) for i in [source, dest, L_k]):
+        raise Exception('Source, destination, or commodity variables are not lists')
+
+    #instantiate solver 
+    solver = pywraplp.Solver.CreateSolver('SAT')
+    if not solver:
+        return
+
+    infinity = solver.infinity()
+
+    #add rho variable
+    rho = solver.NumVar(0.0, infinity, 'p')
+
+    combos = itertools.combinations(range(1,num_nodes+1), 2) #for creating keys
+
+    #add topology variables and topology constraints 
+    topology_var_dict = {} 
+    topology_var_dict = addTopologyVariablesAndConstraints(topology_var_dict, T, solver, combos)
+
+    #add flow variables and flow constraints for each commodity
+    flow_var_dict = {}
+
+    flow_var_dict = addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, solver, source, dest, infinity)
+
     #define the objective
     solver.Maximize(rho)
 
