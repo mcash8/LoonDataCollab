@@ -167,7 +167,7 @@ def addTopologyVariablesAndConstraints(topology_var_dict, T, solver, num_nodes):
     Add the topology variables and topology contraints to solver
     '''
     combos = list(itertools.combinations(range(1,num_nodes+1), 2)) #for creating keys
-    print(combos)
+
     #adding topology variables and bidirectional constraint
     for combo in combos: 
         i, j = combo
@@ -211,8 +211,8 @@ def addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, s
         
         for combo in combos: 
             i, j = combo
-            key1 = 'x' + str(i) +'_'+ str(j) #i,j
-            key2 = 'x' + str(j) +'_'+str(i) #j,i
+            key1 = 'x' + str(i) +'_'+ str(j)+'_'+ str(k) #i,j
+            key2 = 'x' + str(j) +'_'+str(i)+'_'+ str(k) #j,i
 
             #add flow variables
             inner_dict[key1] = solver.IntVar(0.0, infinity, "x" + str(i)+str(j))
@@ -226,10 +226,6 @@ def addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, s
         #for each (i,j) pair
         i, j = combo
 
-        #flow keys
-        key0 = 'x' + str(i) +'_'+ str(j) #i,j
-        key1 = 'x' + str(j) +'_'+str(i) #j,i
-
         key2 = "z" + str(i)+'_'+str(j) #i,j
         key3 = "z" + str(j)+'_'+str(i) #j,i
 
@@ -240,6 +236,10 @@ def addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, s
         for k in range(len(L_k)): 
             inner_key = str(k)
             inner_dict = flow_var_dict[inner_key]
+
+            #flow keys
+            key0 = 'x' + str(i) +'_'+ str(j)+'_'+ str(k) #i,j
+            key1 = 'x' + str(j) +'_'+ str(i)+'_'+ str(k) #j,i
 
             add_1.append(inner_dict[key0])
             add_2.append(inner_dict[key1])
@@ -261,8 +261,8 @@ def addFlowVariablesAndConstraints(topology_var_dict, flow_var_dict, rho, L_k, s
 
             for j in range(1, num_nodes+1): 
                 if i!=j: 
-                    key1 = 'x'+ str(i) + '_' + str(j)
-                    key2 = 'x' + str(j) + '_' + str(i)
+                    key1 = 'x'+ str(i) + '_' + str(j)+'_'+ str(k)
+                    key2 = 'x' + str(j) + '_' + str(i)+'_'+ str(k)
 
                     add.append(inner_dict[key1]) #x_ij
                     sub.append(inner_dict[key2]) #x_ji
